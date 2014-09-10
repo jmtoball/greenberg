@@ -6,7 +6,6 @@ class ImageFootprint(object):
     BLOCK_SIZE = 30
 
     def generate(self, path):
-        print path
         img = Image.open(path)
         img = img.convert('RGB')
         shortest_side = min(img.size)
@@ -22,10 +21,11 @@ class ImageFootprint(object):
             for block_x in range(blocks):
                 offset_x = block_x*self.BLOCK_SIZE
                 block_agg = (0,0,0)
-                for x in range(offset_x, offset_x + self.BLOCK_SIZE):
-                    for y in range(offset_y, offset_y + self.BLOCK_SIZE):
-                        block_agg = map(sum, zip(block_agg, resized.getpixel((x,y))))
-
+                block = resized.crop((offset_x, offset_y, offset_x+self.BLOCK_SIZE, offset_y+self.BLOCK_SIZE))
+                colors = block.getcolors(block_pixels)
+                for color in colors:
+                    quantified = tuple(map(lambda c: color[0]*c, color[1]))
+                    block_agg = map(sum, zip(block_agg, quantified))
                 block_avg = tuple(map(lambda v: v/block_pixels, block_agg))
                 footprint[block_y].append(block_avg)
                 total_agg = map(sum, zip(total_agg, block_avg))
