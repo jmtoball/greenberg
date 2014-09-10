@@ -1,4 +1,4 @@
-image-footprint
-===============
+image-fingerprint
+=================
 
-Python utilities for generating and comparing the footprint of images. Prominent application: Duplicate detection despite re-encodings and resizing.
+Python utilities for generating and comparing the fingerprint of images. Prominent application: Duplicate detection despite re-encodings and resizing.
