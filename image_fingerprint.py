@@ -1,35 +1,43 @@
 from PIL import Image
 
-class ImageFootprint(object):
+class ImageFingerprint(object):
 
-    IMAGE_SIZE = 300
-    BLOCK_SIZE = 30
+    def __init__(self, image_size=300, block_size=30):
+        self.IMAGE_SIZE = image_size
+        self.BLOCK_SIZE = block_size
 
-    def generate(self, path):
+    def _prepare_image(self, path):
         img = Image.open(path)
         img = img.convert('RGB')
         shortest_side = min(img.size)
         cropped = img.crop((0, 0, shortest_side, shortest_side))
         resized = cropped.resize((self.IMAGE_SIZE, self.IMAGE_SIZE), Image.ANTIALIAS)
+        return resized
+
+    def _get_average_color(self, img, block_x, block_y):
+        offset_y = block_y*self.BLOCK_SIZE
+        offset_x = block_x*self.BLOCK_SIZE
+        block = img.crop((offset_x, offset_y, offset_x+self.BLOCK_SIZE, offset_y+self.BLOCK_SIZE))
+        block_pixels = self.BLOCK_SIZE**2
+        colors = block.getcolors(block_pixels)
+        block_agg = (0,0,0)
+        for color in colors:
+            quantified = tuple(map(lambda c: color[0]*c, color[1]))
+            block_agg = map(sum, zip(block_agg, quantified))
+        return tuple(map(lambda v: v/block_pixels, block_agg))
+
+    def generate(self, path):
+        img = self._prepare_image(path)
         blocks = self.IMAGE_SIZE/self.BLOCK_SIZE
         footprint = []
         total_agg = (0,0,0)
-        block_pixels = self.BLOCK_SIZE**2
         for block_y in range(blocks):
             footprint.append([])
-            offset_y = block_y*self.BLOCK_SIZE
             for block_x in range(blocks):
-                offset_x = block_x*self.BLOCK_SIZE
-                block_agg = (0,0,0)
-                block = resized.crop((offset_x, offset_y, offset_x+self.BLOCK_SIZE, offset_y+self.BLOCK_SIZE))
-                colors = block.getcolors(block_pixels)
-                for color in colors:
-                    quantified = tuple(map(lambda c: color[0]*c, color[1]))
-                    block_agg = map(sum, zip(block_agg, quantified))
-                block_avg = tuple(map(lambda v: v/block_pixels, block_agg))
+                block_avg = self._get_average_color(img, block_x, block_y)
                 footprint[block_y].append(block_avg)
                 total_agg = map(sum, zip(total_agg, block_avg))
-        total_avg = tuple(map(lambda v: v/(block_pixels), total_agg))
+        total_avg = tuple(map(lambda v: v/(blocks**2), total_agg))
         return {"total": total_avg, "blocks": footprint}
 
     def compare(self, footprint_a, footprint_b):
