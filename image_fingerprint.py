@@ -1,18 +1,34 @@
 from PIL import Image
 from itertools import product
 
+class FingerprintComparison(object):
+
+    def __init__(self, matches, missing, blocks):
+        self.similarity = matches/float(blocks)
+        self.matches = matches
+        self.missing = missing
+        self.blocks = blocks
+
 class ImageFingerprint(object):
 
-    def __init__(self, image_size=300, block_size=30):
+    def __init__(self, image_size=500, block_size=25, tolerance=0.15):
         self.IMAGE_SIZE = image_size
         self.BLOCK_SIZE = block_size
+        self.TOLERANCE = tolerance
 
     def _prepare_image(self, path):
         img = Image.open(path)
         img = img.convert('RGB')
-        shortest_side = min(img.size)
-        cropped = img.crop((0, 0, shortest_side, shortest_side))
-        resized = cropped.resize((self.IMAGE_SIZE, self.IMAGE_SIZE), Image.ANTIALIAS)
+        width = img.size[0]
+        height = img.size[1]
+        aspect = width/float(height)
+        if aspect >= 1:
+            new_width = self.IMAGE_SIZE
+            new_height = int(round(new_width/aspect))
+        else:
+            new_height = self.IMAGE_SIZE
+            new_width = int(round(new_height*aspect))
+        resized = img.resize((new_width, new_height), Image.BICUBIC)
         return resized
 
     def _get_average_color(self, img, block_x, block_y):
@@ -29,39 +45,46 @@ class ImageFingerprint(object):
 
     def generate(self, path):
         img = self._prepare_image(path)
-        blocks = self.IMAGE_SIZE/self.BLOCK_SIZE
+        blocks_w = img.size[0]/self.BLOCK_SIZE
+        blocks_h = img.size[1]/self.BLOCK_SIZE
         footprint = []
         total_agg = (0,0,0)
-        for block_y in range(blocks):
+        for block_y in range(blocks_h):
             footprint.append([])
-            for block_x in range(blocks):
+            for block_x in range(blocks_w):
                 block_avg = self._get_average_color(img, block_x, block_y)
                 footprint[block_y].append(block_avg)
                 total_agg = map(sum, zip(total_agg, block_avg))
-        total_avg = tuple(map(lambda v: v/(blocks**2), total_agg))
+        total_avg = tuple(map(lambda v: v/(blocks_w*blocks_h), total_agg))
         return {"total": total_avg, "blocks": footprint}
 
     def compare(self, footprint_a, footprint_b):
         footprint_a = footprint_a['blocks']
         footprint_b = footprint_b['blocks']
-        blocks_y = len(footprint_a)
-        blocks_x = len(footprint_a[0])
+        blocks_y = max(len(footprint_a), len(footprint_b))
+        blocks_x = max(len(footprint_a[0]), len(footprint_b[0]))
         matches = 0
+        missing = 0
         for block_y, block_x in product(range(blocks_y), range(blocks_x)):
-            if footprint_a[block_y][block_x] == footprint_b[block_y][block_x]:
-                matches += 1
-        total_blocks = blocks_x*blocks_y
-        return (matches, total_blocks, matches/float(total_blocks))
+            try:
+                rgb_pairs = zip(footprint_a[block_y][block_x], footprint_b[block_y][block_x])
+                rgb_diff = map(lambda p: abs(p[0]-p[1]), rgb_pairs)
+                abs_error = sum(rgb_diff)
+                rel_error = abs_error/255.0
 
-    def similarity(self, footprint_a, footprint_b):
-        return self.compare(footprint_a, footprint_b)[2]
+                if rel_error < self.TOLERANCE:
+                    matches += 1
+            except IndexError:
+                missing += 1
+        total_blocks = blocks_x*blocks_y
+        return FingerprintComparison(matches, missing, total_blocks)
 
     def output(self, footprint, path):
         from PIL import ImageDraw
         footprint = footprint['blocks']
         blocks_y = len(footprint)
         blocks_x = len(footprint[0])
-        out = Image.new('RGB', (self.IMAGE_SIZE, self.IMAGE_SIZE))
+        out = Image.new('RGB', (blocks_x*self.BLOCK_SIZE, blocks_y*self.BLOCK_SIZE))
         drawer = ImageDraw.Draw(out)
         for block_y, block_x in product(range(blocks_y), range(blocks_x)):
             offset_x = block_x * self.BLOCK_SIZE
