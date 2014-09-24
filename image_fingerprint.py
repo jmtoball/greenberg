@@ -1,4 +1,5 @@
 from PIL import Image
+from itertools import product
 
 class ImageFingerprint(object):
 
@@ -46,10 +47,9 @@ class ImageFingerprint(object):
         blocks_y = len(footprint_a)
         blocks_x = len(footprint_a[0])
         matches = 0
-        for block_y in range(blocks_y):
-            for block_x in range(blocks_x):
-                if footprint_a[block_y][block_x] == footprint_b[block_y][block_x]:
-                    matches += 1
+        for block_y, block_x in product(range(blocks_y), range(blocks_x)):
+            if footprint_a[block_y][block_x] == footprint_b[block_y][block_x]:
+                matches += 1
         total_blocks = blocks_x*blocks_y
         return (matches, total_blocks, matches/float(total_blocks))
 
@@ -63,9 +63,8 @@ class ImageFingerprint(object):
         blocks_x = len(footprint[0])
         out = Image.new('RGB', (self.IMAGE_SIZE, self.IMAGE_SIZE))
         drawer = ImageDraw.Draw(out)
-        for block_y in range(blocks_y):
-            for block_x in range(blocks_x):
-                offset_x = block_x*self.BLOCK_SIZE
-                offset_y = block_y*self.BLOCK_SIZE
-                drawer.rectangle((offset_x, offset_y, offset_x+self.BLOCK_SIZE, offset_y+self.BLOCK_SIZE), footprint[block_y][block_x])
+        for block_y, block_x in product(range(blocks_y), range(blocks_x)):
+            offset_x = block_x * self.BLOCK_SIZE
+            offset_y = block_y * self.BLOCK_SIZE
+            drawer.rectangle((offset_x, offset_y, offset_x+self.BLOCK_SIZE, offset_y+self.BLOCK_SIZE), footprint[block_y][block_x])
         out.save(path)
