@@ -94,6 +94,3 @@ class ImageHistogramTest(ImageComparatorTest):
                 if comp.similarity > 0.90 and a != b:
                     print a, b, comp.__dict__
                     print "!"*25
-
-if __name__ == "__main__":
-    unittest.main()
