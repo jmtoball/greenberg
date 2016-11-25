@@ -22,17 +22,29 @@ class Loader(object):
     def load(path):
         return Image.open(path)
 
-class ColorCountList(object):
 
-    @staticmethod
-    def of(image, box):
-        return image.crop(box).getcolors(area(box))
+class ImageOperation(object):
 
-class AverageColor(object):
+    def __init__(self, image, **options):
+        self.image = image
+        self.options = options
 
-    @staticmethod
-    def of(image, box):
-        colors = ColorCountList.of(image, box)
+class Boxed(object):
+
+    def box(self):
+        return self.options.get('box') or img_box(self.image)
+
+class ColorCountList(ImageOperation, Boxed):
+
+    def get(self):
+        box = self.box()
+        return self.image.crop(box).getcolors(area(box))
+
+class AverageColor(ImageOperation, Boxed):
+
+    def get(self):
+        box = self.box()
+        colors = ColorCountList(self.image, box=box).get()
         color_count = area(box)
         total = (0.0, 0.0, 0.0)
         for (amount, color) in colors:
@@ -40,39 +52,49 @@ class AverageColor(object):
             total = map(add, total, weighted)
         return map(div, total, (color_count,)*3)
 
-class DominantColor(object):
+class DominantColor(ImageOperation, Boxed):
 
-    @staticmethod
-    def of(image, box):
-        colors = ColorCountList.of(image, box)
+    def get(self):
+        colors = ColorCountList(self.image, box=self.box()).get()
         return max(colors, key=itemgetter(0))[1]
+
 
 class Comparator(object):
 
-    def compare(self, path_one, path_two):
+    def __init__(self, path_one, path_two):
+        self.path_one = path_one
+        self.path_two = path_two
+
+    def compare(self):
         pass
+
+class ImageComparator(Comparator):
+
+    def __init__(self, path_one, path_two):
+        super(ImageComparator, self).__init__(path_one, path_two)
+        self.image_one = Loader.load(self.path_one)
+        self.image_two = Loader.load(self.path_two)
 
 class FileNameComparator(Comparator):
 
-    def compare(self, path_one, path_two):
-        name_one = path.basename(path_one)
-        name_two = path.basename(path_two)
-        return SequenceMatcher(None, name_one, name_two).ratio()
+    def compare(self):
+        return SequenceMatcher(None,
+            path.basename(self.path_one),
+            path.basename(self.path_two)
+        ).ratio()
 
-class AverageColorComparator(Comparator):
+class AverageColorComparator(ImageComparator):
 
-    def compare(self, path_one, path_two):
-        image_one = Loader.load(path_one)
-        image_two = Loader.load(path_two)
-        color_one = AverageColor.of(image_one, img_box(image_one))
-        color_two = AverageColor.of(image_two, img_box(image_two))
-        return 1.0 - color_diff(color_one, color_two)
+    def compare(self):
+        return 1.0 - color_diff(
+            AverageColor(self.image_one).get(),
+            AverageColor(self.image_two).get()
+        )
 
-class DominantColorComparator(Comparator):
+class DominantColorComparator(ImageComparator):
 
-    def compare(self, path_one, path_two):
-        image_one = Loader.load(path_one)
-        image_two = Loader.load(path_two)
-        color_one = DominantColor.of(image_one, img_box(image_one))
-        color_two = DominantColor.of(image_two, img_box(image_two))
-        return 1.0 - color_diff(color_one, color_two)
+    def compare(self):
+        return 1.0 - color_diff(
+            DominantColor(self.image_one).get(),
+            DominantColor(self.image_two).get()
+        )
