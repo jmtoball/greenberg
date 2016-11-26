@@ -1,5 +1,5 @@
 import unittest
-from comparator import FileNameComparator, DominantColorComparator, AverageColorComparator
+from greenberg.comparators import FileNameComparator, DominantColorComparator, AverageColorComparator
 import os
 from os import path
 
