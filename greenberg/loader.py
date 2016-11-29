@@ -3,4 +3,4 @@ class Loader(object):
 
     @staticmethod
     def load(path):
-        return Image.open(path)
+        return Image.open(path).convert('RGB')
