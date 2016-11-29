@@ -12,3 +12,14 @@ class ColorComparator(ImageComparator):
             self.color_operation(self.image_one).get(),
             self.color_operation(self.image_two).get()
         )
+
+class MultiColorComparator(ColorComparator):
+
+    def compare(self):
+        amount = 3
+        color_diffs = map(Color.diff_perceptive,
+            self.color_operation(self.image_one).get(amount=amount),
+            self.color_operation(self.image_two).get(amount=amount)
+        )
+        average_diff = sum(color_diffs) / amount
+        return 1.0 - average_diff
